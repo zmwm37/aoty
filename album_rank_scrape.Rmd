@@ -5,41 +5,99 @@ date: "January 18, 2019"
 output: html_document
 ---
 ##Libraries
-```{r}
-
-```
-##Scrape data from aoty.org
-```{r}
+```{r, messages = F}
 library(rvest)
 library(dplyr)
 library(tidyr)
-#loop through all top pages and scrape data
+library(stringr)
+```
 
-list <- NULL
-for(i in 1:29){
-        url <- paste(
-                "https://www.albumoftheyear.org/ratings/6-highest-rated/2018/",
-                i, sep = "")
+##Scrape ranks from critic data 
+Taking the top albums from 2018
+```{r, cache = T}
+
+#loop through all top pages and scrape data
+list.i <- NULL #list for inner
+list.o <- NULL #list for outter
+year<-c(2015:2018) #range of years to scrape
+z<-1 #counter
+for (y in year){ #loop through each year
+        url.1 <- paste(
+                        "https://www.albumoftheyear.org/ratings/6-highest-rated/",
+                        y,"/", sep = "")
+        for(i in 1:50){ #loop through each page within each year
+                #50 is arbitrary, I don't think any page will have more 
+                #than 50
+                url <- paste(url.1,i,sep = "")
+                
+                
+                aoty <- read_html(url)
+                list.i[[i]] <- aoty %>% html_nodes('.albumListRow')%>% 
+                        html_text () %>%
+                        data.frame()
+                
+                #once i > number of pages, the website refreshes to the first page
+                #this will break the loop
+                if(i !=1 & list.i[[1]][1,] == list.i[[i]][1,]){
+                        list.i[[i]]<-NULL 
+                        break
         
-        aoty <- read_html(url)
-        list[[i]] <- aoty %>% html_nodes('.albumListRow')%>% html_text () %>%
-                data.frame()
-        
+                }
+                
+        }
+        df.i <- do.call(rbind,list.i)
+        list.o[[z]] <- df.i
+        z<-z+1
 }
 
-df <- (do.call(rbind,list))
+df.o <- do.call(rbind,list.o)
 ```
+
+## Scrape user ratings
 
 ##Clean data
 ```{r}
 
 
-albums.ranks <- df %>% separate(col = 1, 
-                                into = c("rank.album.artist","blank","date","genre","critic.score","n.reviews","junk"),
-                                sep = "\\\n") 
+lp.ranks <- df.o %>% separate(col = 1, 
+                                into = c("c.rank.artist.album","blank","date","genre","critic.score.org","n.reviews.org","stores"),
+                                sep = "\\\n")
 
-#check for missing fields
+#Sometimes genre is missing and columns to the right of genre will have data from wrong variable
+sum(is.na(lp.ranks$stores))
+
+#adjust data for albums with no genre
+index <- is.na(lp.ranks$stores) == T
+lp.ranks[index,]$stores <-lp.ranks[index,]$n.reviews
+lp.ranks[index,]$n.reviews<-lp.ranks[index,]$critic.score
+lp.ranks[index,]$critic.score<-lp.ranks[index,]$genre
+lp.ranks[index,]$genre <-"None"
+
+#check that it worked
+sum(is.na(lp.ranks$stores))
+
+#parse out rank, artist and album
+lp.ranks$critic.rank <- as.numeric(word(lp.ranks$c.rank.artist.album,sep = "\\."))
+lp.ranks$artist <- sub("[0-9]*.\\. *(.*?) *\\-.*", "\\1", lp.ranks$c.rank.artist.album)
+lp.ranks$album <- sub(".*\\-","\\1", lp.ranks$c.rank.artist.album)
 
 
-#%>% select(-blank,-junk)
+
+#extract critc score and number of reviews
+lp.ranks$critic.score <- as.numeric(gsub(".*(.[0-9]+)","\\1",lp.ranks$critic.score.org))
+lp.ranks$n.reviews <- as.numeric(gsub("([0-9]+).*$","\\1",lp.ranks$n.reviews.org))
+
+#flags for stores
+lp.ranks$amazon <- ifelse(grepl("Amazon",lp.ranks$stores) == 1,1,0)
+lp.ranks$iTunesMusic <- ifelse(grepl("iTunesMusic",lp.ranks$stores) == 1,1,0)
+lp.ranks$spotify <- ifelse(grepl("Spotify",lp.ranks$stores) == 1,1,0)
+
+lp.ranks <- lp.ranks %>% select(-c.rank.artist.album,-blank,-n.reviews.org,-critic.score.org,-stores)
+```
+
+```{r}
+if(is.na(lp.ranks$stores)){
+        lp.ranks$genre
+        
+}
 ```
