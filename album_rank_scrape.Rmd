@@ -54,7 +54,7 @@ df.o <- do.call(rbind,list.o)
 ```
 
 ## Scrape user ratings
-
+        
 ##Clean data
 ```{r}
 
