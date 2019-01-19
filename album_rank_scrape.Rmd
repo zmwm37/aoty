@@ -4,7 +4,7 @@ author: "Zander Meitus"
 date: "January 18, 2019"
 output: html_document
 ---
-##Libraries
+## Libraries
 ```{r, messages = F}
 library(rvest)
 library(dplyr)
@@ -12,8 +12,8 @@ library(tidyr)
 library(stringr)
 ```
 
-##Scrape ranks from critic data 
-Taking the top albums from 2018
+## Scrape ranks from critic data 
+The default minimum for an album to be included is 5 critic ratings.
 ```{r, cache = T}
 
 #loop through all top pages and scrape data
@@ -54,13 +54,57 @@ df.o <- do.call(rbind,list.o)
 ```
 
 ## Scrape user ratings
+The default minimum for an album to be considered is 25 user ratings
+```{r, cache = T}
+#loop through all top pages and scrape data
+list.iu <- NULL #list for inner user rating loop
+list.ou <- NULL #list for outter user rating loop
+#year is same as above
+z<-1 #counter
+for (y in year){ #loop through each year
+        url.u1 <- paste(
+                        "https://www.albumoftheyear.org/ratings/user-highest-rated/",
+                        y,"/", sep = "") 
+        for(i in 1:50){ #loop through each page within each year
+                #50 is arbitrary, I don't think any page will have more 
+                #than 50
+                url.u <- paste(url.u1,i,"/",sep = "") #url for user ratings
+                
+                
+                aoty.u <- read_html(url.u)
+                list.iu[[i]] <- aoty.u %>% html_nodes('.albumListRow')%>% 
+                        html_text () %>%
+                        data.frame()
+                
+                #once i > number of pages, the website changes to the next 
+                #highest year's first page, different from user score
+                #this will break the loop by comparing webpage headlines
+                test <- paste("Best Albums of",y,"by User Score", sep = " ")
+                hl <- aoty.u %>% html_nodes('.headline')%>% 
+                        html_text () %>%
+                        data.frame()
+                if(hl != test){
+                        
+                        list.iu[[i]]<-NULL 
+                        break
         
-##Clean data
+                }
+                
+        }
+        df.iu <- do.call(rbind,list.iu)
+        list.ou[[z]] <- df.iu
+        z<-z+1
+}
+
+df.ou <- do.call(rbind,list.ou)
+```
+        
+## Clean critic data
 ```{r}
 
 
 lp.ranks <- df.o %>% separate(col = 1, 
-                                into = c("c.rank.artist.album","blank","date","genre","critic.score.org","n.reviews.org","stores"),
+                                into = c("c.rank.artist.album","blank","date.org","genre","critic.score.org","n.reviews.org","stores"),
                                 sep = "\\\n")
 
 #Sometimes genre is missing and columns to the right of genre will have data from wrong variable
@@ -68,9 +112,9 @@ sum(is.na(lp.ranks$stores))
 
 #adjust data for albums with no genre
 index <- is.na(lp.ranks$stores) == T
-lp.ranks[index,]$stores <-lp.ranks[index,]$n.reviews
-lp.ranks[index,]$n.reviews<-lp.ranks[index,]$critic.score
-lp.ranks[index,]$critic.score<-lp.ranks[index,]$genre
+lp.ranks[index,]$stores <-lp.ranks[index,]$n.reviews.org
+lp.ranks[index,]$n.reviews.org<-lp.ranks[index,]$critic.score.org
+lp.ranks[index,]$critic.score.org<-lp.ranks[index,]$genre
 lp.ranks[index,]$genre <-"None"
 
 #check that it worked
@@ -81,7 +125,8 @@ lp.ranks$critic.rank <- as.numeric(word(lp.ranks$c.rank.artist.album,sep = "\\."
 lp.ranks$artist <- sub("[0-9]*.\\. *(.*?) *\\-.*", "\\1", lp.ranks$c.rank.artist.album)
 lp.ranks$album <- sub(".*\\-","\\1", lp.ranks$c.rank.artist.album)
 
-
+#clean date
+lp.ranks$date<-as.Date(lp.ranks$date.org,"%B %d,%Y")
 
 #extract critc score and number of reviews
 lp.ranks$critic.score <- as.numeric(gsub(".*(.[0-9]+)","\\1",lp.ranks$critic.score.org))
@@ -92,12 +137,61 @@ lp.ranks$amazon <- ifelse(grepl("Amazon",lp.ranks$stores) == 1,1,0)
 lp.ranks$iTunesMusic <- ifelse(grepl("iTunesMusic",lp.ranks$stores) == 1,1,0)
 lp.ranks$spotify <- ifelse(grepl("Spotify",lp.ranks$stores) == 1,1,0)
 
-lp.ranks <- lp.ranks %>% select(-c.rank.artist.album,-blank,-n.reviews.org,-critic.score.org,-stores)
+lp.ranks.c <- lp.ranks %>% select(-c.rank.artist.album,-blank,-date.org,-n.reviews.org,-critic.score.org,-stores)
+        #i should make the dataframe lp.ranks.c in this entire section
 ```
 
+## Clean user score data and join with critic data
+
 ```{r}
-if(is.na(lp.ranks$stores)){
-        lp.ranks$genre
-        
-}
+
+lp.ranks.u <- df.ou %>% separate(col = 1, 
+                                into = c("u.rank.artist.album","blank","date.org","genre","user.score.org","n.user.reviews.org","stores"),
+                                sep = "\\\n")
+
+#Sometimes genre is missing and columns to the right of genre will have data from wrong variable
+sum(is.na(lp.ranks.u$stores))
+
+#adjust data for albums with no genre
+index.u <- is.na(lp.ranks.u$stores) == T
+lp.ranks.u[index.u,]$stores <-lp.ranks.u[index.u,]$n.user.reviews.org
+lp.ranks.u[index.u,]$n.user.reviews.org<-lp.ranks.u[index.u,]$user.score.org
+lp.ranks.u[index.u,]$user.score.org<-lp.ranks.u[index.u,]$genre
+lp.ranks.u[index.u,]$genre <-"None"
+#check that it worked
+sum(is.na(lp.ranks.u$stores))
+
+#parse out rank, artist and album
+lp.ranks.u$user.rank <- as.numeric(word(lp.ranks.u$u.rank.artist.album,sep = "\\."))
+lp.ranks.u$artist <- sub("[0-9]*.\\. *(.*?) *\\-.*", "\\1", lp.ranks.u$u.rank.artist.album)
+lp.ranks.u$album <- sub(".*\\-","\\1", lp.ranks.u$u.rank.artist.album)
+
+#clean date
+lp.ranks.u$date.org <- gsub("(\\d)[^0-9]+,","\\1",lp.ranks.u$date.org)
+lp.ranks.u$date <- as.Date(lp.ranks.u$date.org,"%B %d %Y")
+
+#extract critc score and number of reviews
+lp.ranks.u$user.score <- as.numeric(
+        gsub("USER SCORE","",lp.ranks.u$user.score.org)
+        )
+lp.ranks.u$n.user.reviews <- as.numeric(
+        gsub("([0-9]+).*$","\\1",lp.ranks.u$n.user.reviews.org)
+        )
+
+#flags for stores
+lp.ranks.u$amazon <- ifelse(grepl("Amazon",lp.ranks.u$stores) == 1,1,0)
+lp.ranks.u$iTunesMusic <- ifelse(grepl("iTunesMusic",lp.ranks.u$stores) == 1,1,0)
+lp.ranks.u$spotify <- ifelse(grepl("Spotify",lp.ranks.u$stores)==1,1,0) 
+
+lp.ranks.u <- lp.ranks.u %>% 
+        select(-u.rank.artist.album,-blank,-date.org,-n.user.reviews.org,-user.score.org,-stores)
+
+lp.ranks <- full_join(x = lp.ranks.c, y = lp.ranks.u, 
+                      by = c("artist","album","genre","date","amazon","iTunesMusic","spotify"))
+
+#reorder dataframe
+lp.ranks <- lp.ranks %>% select("artist","album","date","genre","critic.rank",
+                                "user.rank","critic.score","user.score",
+                                "n.reviews","n.user.reviews","amazon",
+                                "iTunesMusic","spotify")
 ```
