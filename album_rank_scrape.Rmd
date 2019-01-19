@@ -1,0 +1,45 @@
+---
+title: "Scraping Practice - AOTY.org"
+author: "Zander Meitus"
+date: "January 18, 2019"
+output: html_document
+---
+##Libraries
+```{r}
+
+```
+##Scrape data from aoty.org
+```{r}
+library(rvest)
+library(dplyr)
+library(tidyr)
+#loop through all top pages and scrape data
+
+list <- NULL
+for(i in 1:29){
+        url <- paste(
+                "https://www.albumoftheyear.org/ratings/6-highest-rated/2018/",
+                i, sep = "")
+        
+        aoty <- read_html(url)
+        list[[i]] <- aoty %>% html_nodes('.albumListRow')%>% html_text () %>%
+                data.frame()
+        
+}
+
+df <- (do.call(rbind,list))
+```
+
+##Clean data
+```{r}
+
+
+albums.ranks <- df %>% separate(col = 1, 
+                                into = c("rank.album.artist","blank","date","genre","critic.score","n.reviews","junk"),
+                                sep = "\\\n") 
+
+#check for missing fields
+
+
+#%>% select(-blank,-junk)
+```
