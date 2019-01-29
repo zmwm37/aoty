@@ -1,5 +1,5 @@
 ---
-title: "Scraping Practice - AOTY.org"
+title: "Album Rank and Score Scraping- AOTY.org"
 author: "Zander Meitus"
 date: "January 18, 2019"
 output: html_document
@@ -194,4 +194,29 @@ lp.ranks <- lp.ranks %>% select("artist","album","date","genre","critic.rank",
                                 "user.rank","critic.score","user.score",
                                 "n.reviews","n.user.reviews","amazon",
                                 "iTunesMusic","spotify")
+
+```
+
+
+##Write out datasets
+```{r}
+save(lp.ranks, file ="./album_ranks_2015_2018.RData")
+
+lp.ranks.long.a <- lp.ranks %>% select(artist:genre,critic.score:user.score) %>%
+        gather(key = "rater",value = "mean.score", user.score,critic.score)
+
+
+lp.ranks.long.b <- lp.ranks %>% select(artist:user.rank) %>%
+        gather(key = "rater",value = "rank", user.rank,critic.rank) %>%
+        select(rank)
+
+
+lp.ranks.long.c <- lp.ranks %>% select(artist:genre,n.reviews:n.user.reviews) %>%
+        gather(key = "category",value = "n.reviews", n.reviews,n.user.reviews)%>%
+        select(n.reviews)
+        
+lp.ranks.long <- cbind(lp.ranks.long.a,lp.ranks.long.b,lp.ranks.long.c)
+lp.ranks.long$rater <- gsub("\\.score","",lp.ranks.long$rater)
+
+save(lp.ranks.long, file ="./album_ranks_long_2015_2018.RData")
 ```

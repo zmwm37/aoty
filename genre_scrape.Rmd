@@ -1,0 +1,63 @@
+---
+title: "Album Genre Scraping - AOTY.org"
+author: "Zander Meitus"
+date: "January 19, 2019"
+output: html_document
+---
+## Overview
+This script is designed to scrape all the genre tags for each album. These tags will be used for additional analyses.
+
+
+## Libraries
+```{r, messages = F}
+library(rvest)
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+##Scrape all genres from 2018
+```{r, cache = T}
+#add outer loop of urls for each page of 25 albums 
+
+#make vector of album page urls
+url <- "https://www.albumoftheyear.org/ratings/6-highest-rated/2018/1"
+
+html <- read_html(url)
+
+album.urls <- html %>% html_nodes(".albumListTitle a") %>% html_attr('href')
+
+#scrape genre from each url
+list <- list()
+z<-1
+for(u in album.urls){
+        url.a <- paste("https://www.albumoftheyear.org",u,sep = "")
+        html <- read_html(url.a)
+        list[[z]] <- html %>% html_nodes(".tag") %>% html_text()
+        z<- z+1
+}
+
+#combine vectors into a dataframe
+tags<-as.data.frame(
+        t(
+                as.matrix(sapply(list, '[', seq(max(sapply(list, length))))
+                          )
+        ),
+        col.names = c("tag1","tag2","tag3","tag4","tag5","tag6")
+)
+                
+
+```
+
+## Clean genre tags
+
+```{r}
+tags2 <- data.frame(sapply(tags, as.character))
+g <- function(x){
+        x2<- as.character(tags$v5)
+        i<-grep("perfect rating",x2)
+        x2[i]<- ""
+}
+
+tags2<- data.frame(sapply(tags, g))
+```
