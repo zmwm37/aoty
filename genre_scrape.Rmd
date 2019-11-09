@@ -14,6 +14,7 @@ library(rvest)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(igraph)
 ```
 
 ##Scrape all genres from 2018
@@ -37,7 +38,7 @@ for(u in album.urls){
         z<- z+1
 }
 
-#combine vectors into a dataframe
+# combine vectors into a dataframe
 tags<-as.data.frame(
         t(
                 as.matrix(sapply(list, '[', seq(max(sapply(list, length))))
@@ -45,7 +46,29 @@ tags<-as.data.frame(
         ),
         col.names = c("tag1","tag2","tag3","tag4","tag5","tag6")
 )
-                
+
+# get all combinations of two genres on same album
+outlist <- list() 
+
+for(i in 1:11){
+        
+        x <- unlist(list[i]) # i think i could do this with tags df instead, and do it after cleaning
+        xCombo <- data.frame(t(combn(x,2)))
+        outlist[[i]] <- xCombo
+}
+ 
+tagCombos <- do.call(rbind,outlist)
+
+colnames(tagCombos) <- c('tag1','tag2')
+
+g <- graph_from_data_frame(tagCombos, directed=F)
+print(g, e=TRUE, v=TRUE)
+
+cluster <- cluster_louvain(g)
+
+plot(g)
+
+table(tagCombos$tag1,tagCombos$tag2)
 
 ```
 
