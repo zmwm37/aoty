@@ -16,6 +16,7 @@ library(tidyr)
 library(stringr)
 library(igraph)
 library(visNetwork)
+
 ```
 
 ##Scrape all genres from 2018
@@ -54,9 +55,47 @@ for(i in pages){
         tagsList[[i]] <- tags 
 }
 
-# ensure all parts of list are same length
-tagsList[[11]] <- NULL
-tagsDf <- do.call(rbind,tagsList)
+# separate into lists of proper length and too short
+tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==7)]
+
+tagsListBad <- tagsList[sapply(tagsList,function(x) ncol(x) !=7)]
+
+full.names <- c('V1','V2','V3','V4','V5','V6','V7')
+
+# add missing columns to bad tag lists
+redeemed.list <- list()
+for(i in length(tagsListBad)){
+        df <- tagsListBad[i][[1]]
+        
+        
+        missing.names <- setdiff(full.names,names(df))
+        
+        # create missing variables
+        missingVars <-data.frame(
+                matrix(
+                        rep(NA,
+                            dim(df)[1]*length(missing.names)
+                            ),
+                        dim(df)[1]
+                        )
+                )
+        
+         colnames(missingVars) <- missing.names
+         
+         dfFull <- cbind(df,missingVars)
+         
+         redeemed.list[[i]] <-dfFull
+}
+
+ 
+tagsDfGood <- do.call(rbind,tagsListGood)
+tagsDfRedeem <- do.call(rbind, redeemed.list)
+
+# combine dataframes
+
+tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem)
+
+
 colnames(tagsDf) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
 # saveout dataframe
 saveRDS(tagsDf,'aotyGenreTags2018.Rds')
@@ -74,21 +113,25 @@ for(i in 1:nrow(tagsDf)){
 tagCombos <- do.call(rbind,outlist)
 
 colnames(tagCombos) <- c('tag1','tag2')
-tagCombos <- tagCombos %>% filter(complete.cases(.))
+tagCombos <- tagCombos %>% filter(complete.cases(.),
+                                  tag1 != ' Add Tag' & tag2 != ' Add Tag',
+                                  tag1 != ' More' & tag2 != ' More')
+
+recordIndex <- c(grep("record", tagCombos$tag1),grep("record", tagCombos$tag2))
+
+
+tagCombos <- tagCombos[-recordIndex,]
 # tagCombos<- tagCombos[1:500,]
+saveRDS()
 ```
 
 ## Plot graph
 ```{r}
 g <- graph_from_data_frame(tagCombos, directed=F)
-print(g, e=TRUE, v=TRUE)
 
 cluster <- cluster_louvain(g)
 
-plot(g)
-
-tcTab<- table(tagCombos$tag1,tagCombos$tag2)
-View(tcTab)
+# plot(g)
 
 # visNetwork
 nodes <- data.frame(
