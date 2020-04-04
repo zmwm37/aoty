@@ -96,38 +96,39 @@ tagsDfRedeem <- do.call(rbind, redeemed.list)
 tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem)
 
 
-colnames(tagsDf) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
+colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
 # saveout dataframe
-saveRDS(tagsDf,'aotyGenreTags2018.Rds')
+saveRDS(tagsDfFull,'aotyGenreTags2018.Rds')
 
 # get all combinations of two genres on same album
 outlist <- list() 
 
-for(i in 1:nrow(tagsDf)){
+for(i in 1:nrow(tagsDfFull)){
         
-        x <- as.character(unlist(tagsDf[i,])) 
+        x <- as.character(unlist(tagsDfFull[i,])) 
         xCombo <- data.frame(t(combn(x,2)))
         outlist[[i]] <- xCombo
 }
  
-tagCombos <- do.call(rbind,outlist)
+tagCombosRaw <- do.call(rbind,outlist)
 
-colnames(tagCombos) <- c('tag1','tag2')
-tagCombos <- tagCombos %>% filter(complete.cases(.),
+colnames(tagCombosRaw) <- c('tag1','tag2')
+tagCombosClean1 <- tagCombosRaw %>% filter(complete.cases(.),
                                   tag1 != ' Add Tag' & tag2 != ' Add Tag',
                                   tag1 != ' More' & tag2 != ' More')
 
-recordIndex <- c(grep("record", tagCombos$tag1),grep("record", tagCombos$tag2))
+recordIndex <- c(grep("record", tagCombosClean1$tag1),
+                 grep("record", tagCombosClean1$tag2))
 
 
-tagCombos <- tagCombos[-recordIndex,]
+tagCombosClean <- tagCombosClean1[-recordIndex,]
 # tagCombos<- tagCombos[1:500,]
 saveRDS()
 ```
 
 ## Plot graph
 ```{r}
-g <- graph_from_data_frame(tagCombos, directed=F)
+g <- graph_from_data_frame(tagCombosClean, directed=F)
 
 cluster <- cluster_louvain(g)
 
@@ -136,21 +137,22 @@ cluster <- cluster_louvain(g)
 # visNetwork
 nodes <- data.frame(
         id = unique(
-                c(unique(as.character(tagCombos$tag1)),
-                unique(as.character(tagCombos$tag2)))
+                c(unique(as.character(tagCombosClean$tag1)),
+                unique(as.character(tagCombosClean$tag2)))
                 ),
         label = unique(
-                c(unique(as.character(tagCombos$tag1)),
-                unique(as.character(tagCombos$tag2)))
+                c(unique(as.character(tagCombosClean$tag1)),
+                unique(as.character(tagCombosClean$tag2)))
                 )
         )
 
-edges <- tagCombos
+edges <- tagCombosClean
 colnames(edges) <- c('from','to')
 
 # plot the graph
 visNetwork(nodes,edges) %>%
-        visPhysics(maxVelocity = 1)
+        visPhysics(maxVelocity = 1) %>%
+        visClusteringByColor(colors = 'blue')
 ```
 
 ## Clean genre tags
