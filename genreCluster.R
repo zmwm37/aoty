@@ -7,7 +7,11 @@ library(visNetwork)
 library(wesanderson)
 
 # LOAD DATA ----
-tagsDfFull <- readRDS('./aotyGenreTags2018.Rds')
+tags15 <- readRDS('./aotyGenreTags2015.Rds')
+tags16 <- readRDS('./aotyGenreTags2016.Rds')
+tags17 <- readRDS('./aotyGenreTags2017.Rds')
+tags18 <- readRDS('./aotyGenreTags2018.Rds')
+tags19 <- readRDS('./aotyGenreTags2019.Rds')
 
 # TRANFORM DATA ----
 outlist <- list() 

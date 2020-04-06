@@ -19,87 +19,122 @@ library(visNetwork)
 
 ```
 
+## Functions
+```{r}
+source('./functions/cleanCriticScore.R')
+```
+
 ##Scrape all genres from 2018
 ```{r, cache = T}
-#add outer loop of urls for each page of 25 albums 
-pages <- 1:30
-tagsList <- list()
+pages <- 1
+years <- c(2019)
 
-for(i in pages){
-        #make vector of album page urls
-        url <- paste0("https://www.albumoftheyear.org/ratings/6-highest-rated/2018/",i)
+
+# loop for each year
+for (y in years){
+        tagsList <- list()
+        albumList<- list()
         
-        html <- read_html(url)
-        
-        album.urls <- html %>% html_nodes(".albumListTitle a") %>% html_attr('href')
-        
-        #scrape genre from each url
-        list <- list()
-        z<-1
-        for(u in album.urls){
-                url.a <- paste("https://www.albumoftheyear.org",u,sep = "")
-                html <- read_html(url.a)
-                list[[z]] <- html %>% html_nodes(".tag") %>% html_text()
-                z<- z+1
+        # loop of urls for each page of 25 albums 
+        for(i in pages){
+                #make vector of album page urls
+                url <- paste0("https://www.albumoftheyear.org/ratings/6-highest-rated/",y,"/",i)
+                
+                html <- read_html(url)
+                
+                # store artist, album, and ranks
+                albumList[[i]] <- html %>% html_nodes('.albumListRow')%>% 
+                        html_text () %>%
+                        data.frame()
+                
+                # store urls for tags loops
+                album.urls <- html %>% 
+                        html_nodes(".albumListTitle a") %>% 
+                        html_attr('href')
+                
+                
+                
+                #scrape genre from each url
+                list <- list()
+                z<-1
+                for(u in album.urls){
+                        url.a <- paste("https://www.albumoftheyear.org",u,sep = "")
+                        html <- read_html(url.a)
+                        list[[z]] <- html %>% 
+                                html_nodes(".tag") %>% 
+                                html_text()
+                        z<- z+1
+                }
+                
+                # combine vectors into a dataframe
+                tags<-as.data.frame(
+                        t(
+                                as.matrix(sapply(list, '[', seq(max(sapply(list, length))))
+                                          )
+                                )
+                        )
+                
+                
+                tagsList[[i]] <- tags 
         }
         
-        # combine vectors into a dataframe
-        tags<-as.data.frame(
-                t(
-                        as.matrix(sapply(list, '[', seq(max(sapply(list, length))))
-                                  )
-                        )
-                )
+        # separate into lists of proper length and too short
+        tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==7)]
+        
+        tagsListBad <- tagsList[sapply(tagsList,function(x) ncol(x) !=7)]
+        
+        full.names <- c('V1','V2','V3','V4','V5','V6','V7')
+        
+        # add missing columns to bad tag lists
+        redeemed.list <- list()
+        if(length(tagsListBad >0)){
+                for(b in length(tagsListBad)){
+                        df <- tagsListBad[b][[1]]
+                        
+                        
+                        missing.names <- setdiff(full.names,names(df))
+                        
+                        # create missing variables
+                        missingVars <-data.frame(
+                                matrix(
+                                        rep(NA,
+                                            dim(df)[1]*length(missing.names)
+                                            ),
+                                        dim(df)[1]
+                                        )
+                                )
+                        
+                         colnames(missingVars) <- missing.names
+                         
+                         dfFull <- cbind(df,missingVars)
+                         
+                         redeemed.list[[b]] <-dfFull
+                }
+        
+        }
+        tagsDfGood <- do.call(rbind,tagsListGood)
+        tagsDfRedeem <- do.call(rbind, redeemed.list)
+        
+        # combine tag dataframes
+        tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem)
+        
+        # combine album dataframes
+        albumDfRaw <- do.call(rbind, albumList)
+        
+        # clean album dataframes
+        albumDfClean <- cleanCriticScore(albumDfRaw)
         
         
-        tagsList[[i]] <- tags 
+        colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
+        
+        final <- cbind(albumDfClean,tagsDfFull) # temporary, these aren't matched
+        # saveout dataframe
+        # saveRDS(tagsDfFull,paste0('aotyGenreTags',y,'.Rds'))
 }
+```
 
-# separate into lists of proper length and too short
-tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==7)]
-
-tagsListBad <- tagsList[sapply(tagsList,function(x) ncol(x) !=7)]
-
-full.names <- c('V1','V2','V3','V4','V5','V6','V7')
-
-# add missing columns to bad tag lists
-redeemed.list <- list()
-for(i in length(tagsListBad)){
-        df <- tagsListBad[i][[1]]
-        
-        
-        missing.names <- setdiff(full.names,names(df))
-        
-        # create missing variables
-        missingVars <-data.frame(
-                matrix(
-                        rep(NA,
-                            dim(df)[1]*length(missing.names)
-                            ),
-                        dim(df)[1]
-                        )
-                )
-        
-         colnames(missingVars) <- missing.names
-         
-         dfFull <- cbind(df,missingVars)
-         
-         redeemed.list[[i]] <-dfFull
-}
-
- 
-tagsDfGood <- do.call(rbind,tagsListGood)
-tagsDfRedeem <- do.call(rbind, redeemed.list)
-
-# combine dataframes
-
-tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem)
-
-
-colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
-# saveout dataframe
-saveRDS(tagsDfFull,'aotyGenreTags2018.Rds')
-
+##Process scraped genres
+```{r}
 # get all combinations of two genres on same album
 outlist <- list() 
 
