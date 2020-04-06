@@ -52,8 +52,6 @@ for (y in years){
                         html_nodes(".albumListTitle a") %>% 
                         html_attr('href')
                 
-                
-                
                 #scrape genre from each url
                 list <- list()
                 z<-1
@@ -74,24 +72,36 @@ for (y in years){
                                 )
                         )
                 
+                # set parameters for id
+                a <- ((i-1)*25)+1
+                b <- a + dim(tags)[1]-1
                 
+                # create id so they can be ordered properly for combination
+                tags$id <- a:b
+                        
                 tagsList[[i]] <- tags 
         }
         
+        
+        # set what names should be
+        full.names <- c('V1','V2','V3','V4','V5','V6','V7','id')
+        
         # separate into lists of proper length and too short
-        tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==7)]
+        tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==length(full.names))]
         
-        tagsListBad <- tagsList[sapply(tagsList,function(x) ncol(x) !=7)]
+        tagsListBad <- tagsList[sapply(tagsList,function(x) ncol(x) != length(full.names))]
         
-        full.names <- c('V1','V2','V3','V4','V5','V6','V7')
+
         
         # add missing columns to bad tag lists
         redeemed.list <- list()
         if(length(tagsListBad >0)){
+                
                 for(b in length(tagsListBad)){
+                        
                         df <- tagsListBad[b][[1]]
                         
-                        
+                        # identify missing columns
                         missing.names <- setdiff(full.names,names(df))
                         
                         # create missing variables
@@ -112,11 +122,14 @@ for (y in years){
                 }
         
         }
+        
+        # make into dataframes
         tagsDfGood <- do.call(rbind,tagsListGood)
         tagsDfRedeem <- do.call(rbind, redeemed.list)
         
         # combine tag dataframes
-        tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem)
+        tagsDfFull <- rbind(tagsDfGood,tagsDfRedeem) %>%
+                arrange(id)
         
         # combine album dataframes
         albumDfRaw <- do.call(rbind, albumList)
@@ -124,10 +137,11 @@ for (y in years){
         # clean album dataframes
         albumDfClean <- cleanCriticScore(albumDfRaw)
         
+        # rename columns
+        colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7","id")
         
-        colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7")
-        
-        final <- cbind(albumDfClean,tagsDfFull) # temporary, these aren't matched
+        # combine album info with genre tags
+        final <- cbind(albumDfClean,tagsDfFull)
         # saveout dataframe
         # saveRDS(tagsDfFull,paste0('aotyGenreTags',y,'.Rds'))
 }
