@@ -24,7 +24,7 @@ library(visNetwork)
 source('./functions/cleanCriticScore.R')
 ```
 
-##Scrape all genres from 2018
+##Scrape critic data and genres
 ```{r, cache = T}
 pages <- 1
 years <- c(2019)
@@ -42,7 +42,7 @@ for (y in years){
                 
                 html <- read_html(url)
                 
-                # store artist, album, and ranks
+                # store artist, album, and critic data 
                 albumList[[i]] <- html %>% html_nodes('.albumListRow')%>% 
                         html_text () %>%
                         data.frame()
