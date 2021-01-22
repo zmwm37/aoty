@@ -52,15 +52,27 @@ for (y in years){
                         html_nodes(".albumListTitle a") %>% 
                         html_attr('href')
                 
+                # store album titles/artist for linking
+                album.titles <- html %>%
+                        html_nodes(".albumListTitle a") %>%
+                        html_text()
+                
                 #scrape genre from each url
                 list <- list()
                 z<-1
                 for(u in album.urls){
                         url.a <- paste("https://www.albumoftheyear.org",u,sep = "")
                         html <- read_html(url.a)
-                        list[[z]] <- html %>% 
+                        
+                        # genre tags
+                        genreTags <- html %>% 
                                 html_nodes(".tag") %>% 
                                 html_text()
+                        
+                        # album name 
+                        albumArtist <- album.titles[z]
+                        
+                        list[[z]] <- c(albumArtist, genreTags)
                         z<- z+1
                 }
                 
@@ -72,19 +84,13 @@ for (y in years){
                                 )
                         )
                 
-                # set parameters for id
-                a <- ((i-1)*25)+1
-                b <- a + dim(tags)[1]-1
-                
-                # create id so they can be ordered properly for combination
-                tags$id <- a:b
                         
                 tagsList[[i]] <- tags 
         }
         
         
         # set what names should be
-        full.names <- c('V1','V2','V3','V4','V5','V6','V7','id')
+        full.names <- c('album.info','V1','V2','V3','V4','V5','V6','V7')
         
         # separate into lists of proper length and too short
         tagsListGood <- tagsList[sapply(tagsList,function(x) ncol(x) ==length(full.names))]
@@ -138,7 +144,8 @@ for (y in years){
         albumDfClean <- cleanCriticScore(albumDfRaw)
         
         # rename columns
-        colnames(tagsDfFull) = c("tag1","tag2","tag3","tag4","tag5","tag6","tag7","id")
+        colnames(tagsDfFull) = c('album.info', "tag1","tag2","tag3","tag4",
+                                 "tag5","tag6","tag7")
         
         # combine album info with genre tags
         final <- cbind(albumDfClean,tagsDfFull)
@@ -149,13 +156,15 @@ for (y in years){
 
 ##Process scraped genres
 ```{r}
+# join on album ID
 # get all combinations of two genres on same album
 outlist <- list() 
 
 for(i in 1:nrow(tagsDfFull)){
         
-        x <- as.character(unlist(tagsDfFull[i,])) 
-        xCombo <- data.frame(t(combn(x,2)))
+        x <- as.character(unlist(tagsDfFull[i,]))[] 
+        xCombo <- data.frame(album_id = tagsDfFull[i,1], t(combn(x[2:length(x)],2)))
+        # output album ID and tags
         outlist[[i]] <- xCombo
 }
  
